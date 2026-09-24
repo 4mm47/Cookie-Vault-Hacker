@@ -1,55 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>🍪 Cookie Vault Hacker 🍪</title>
-    <style>
-        body { 
-            width: 350px; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            padding: 20px; 
-            background-color: #f9f9fb; 
-            color: #333; 
-            text-align: center;
-        }
-        h2 { 
-            color: #c0392b; 
-            border-bottom: 3px solid #f39c12; 
-            padding-bottom: 10px; 
-            margin-top: 0;
-        }
-        button { 
-            background-color: #c0392b; 
-            color: white; 
-            padding: 15px 20px; 
-            border: none; 
-            cursor: pointer; 
-            border-radius: 8px; 
-            font-size: 18px; 
-            width: 100%;
-            margin-top: 20px;
-            transition: background-color 0.3s, transform 0.1s;
-        }
-        button:hover:enabled { background-color: #a93126; transform: translateY(-1px); }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
-        #status { 
-            margin-top: 25px; 
-            padding: 15px; 
-            background-color: #ecf0f1; 
-            border-radius: 6px; 
-            border-left: 5px solid #f39c12;
-            min-height: 80px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Cookie Vault - session inspector &amp; exporter</title>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <h2>🍪 Cookie Vault Hacker 🍪</h2>
-    <p>🕵️ This extension harvests all active cookies from the current tab and forces a download. 📥</p>
+  <header class="masthead">
+    <img class="logo" src="icons/icon48.png" alt="" width="30" height="30">
+    <div class="masthead-text">
+      <h1>Cookie Vault</h1>
+      <p id="versionLine">Session inspector &amp; exporter</p>
+    </div>
+    <span class="pill" title="This extension only ever reads cookies and asks the browser for a local file. It makes no network requests.">
+      read-only
+    </span>
+  </header>
 
-    <button id="hackButton">🚨 Steal Cookies &amp; Download File 🚨</button>
+  <section class="panel site-panel">
+    <div class="site-line">
+      <img class="favicon" id="siteFavicon" alt="" width="16" height="16" hidden>
+      <strong id="siteHost">Reading current tab&hellip;</strong>
+      <span class="pill pill-warn" id="siteBadge" hidden>restricted page</span>
+    </div>
+    <p class="site-title" id="siteTitle"></p>
+  </section>
 
-    <div id="status">Awaiting action...</div>
+  <section class="panel">
+    <h2 class="panel-title">1. Choose what to read</h2>
+    <div class="scopes" role="radiogroup" aria-label="Cookie scope">
+      <label class="scope">
+        <input type="radio" name="scope" id="scopeTab" value="tab">
+        <span class="scope-text"><strong>This tab</strong><small>Cookies the browser would send to this exact URL.</small></span>
+      </label>
+      <label class="scope">
+        <input type="radio" name="scope" id="scopeSite" value="site">
+        <span class="scope-text"><strong>Whole site</strong><small>Adds sub-domain and parent-domain cookies.</small></span>
+      </label>
+      <label class="scope">
+        <input type="radio" name="scope" id="scopeAll" value="all">
+        <span class="scope-text"><strong>Everything</strong><small>Every cookie in this browser profile.</small></span>
+      </label>
+    </div>
+    <p class="warn" id="scopeWarning" hidden>
+      You selected <strong>Everything</strong>: this includes session cookies for
+      every account signed in to this browser profile. Export only when there is a
+      legitimate reason to handle all of them.
+    </p>
+  </section>
 
-    <script src="popup.js"></script>
+  <section class="panel">
+    <h2 class="panel-title">2. Choose the output</h2>
+    <label class="field">
+      <span>Format</span>
+      <select id="formatSelect"></select>
+    </label>
+    <div class="checks">
+      <label class="check">
+        <input type="checkbox" id="optHideValues">
+        <span>Hide cookie values<small>Replaces each value with a length placeholder - safe to share.</small></span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="optIncludeExpired">
+        <span>Include expired cookies</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="optAskWhere">
+        <span>Ask where to save</span>
+      </label>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button type="button" id="scanBtn" class="btn btn-ghost" title="Re-read cookies without exporting">Rescan</button>
+    <button type="button" id="exportBtn" class="btn btn-primary">Download file</button>
+    <button type="button" id="copyBtn" class="btn">Copy</button>
+  </div>
+
+  <section class="panel" id="statsPanel" hidden>
+    <h2 class="panel-title">Summary <span class="muted" id="statsScope"></span></h2>
+    <div class="stats">
+      <div class="stat"><span class="stat-value" id="statTotal">0</span><span class="stat-label">cookies</span></div>
+      <div class="stat"><span class="stat-value" id="statSession">0</span><span class="stat-label">session</span></div>
+      <div class="stat"><span class="stat-value" id="statPersistent">0</span><span class="stat-label">persistent</span></div>
+      <div class="stat"><span class="stat-value" id="statSecure">0</span><span class="stat-label">secure</span></div>
+      <div class="stat"><span class="stat-value" id="statHttpOnly">0</span><span class="stat-label">HttpOnly</span></div>
+      <div class="stat"><span class="stat-value" id="statExpiring">0</span><span class="stat-label">expiring &le;7d</span></div>
+    </div>
+    <p class="muted" id="statsExtra"></p>
+  </section>
+
+  <section class="panel" id="resultsPanel" hidden>
+    <h2 class="panel-title">Cookies</h2>
+    <label class="field field-inline">
+      <span class="sr-only">Filter cookies</span>
+      <input type="search" id="searchInput" placeholder="Filter by name, value, domain or path&hellip;" autocomplete="off">
+    </label>
+    <div class="chips" id="filterChips">
+      <button type="button" class="chip is-active" data-filter="all">All</button>
+      <button type="button" class="chip" data-filter="session">Session</button>
+      <button type="button" class="chip" data-filter="persistent">Persistent</button>
+      <button type="button" class="chip" data-filter="secure">Secure</button>
+      <button type="button" class="chip" data-filter="httponly">HttpOnly</button>
+      <button type="button" class="chip" data-filter="expiring">Expiring &le;7d</button>
+    </div>
+    <p class="muted" id="resultsMeta"></p>
+    <div class="table-wrap">
+      <table class="cookies">
+        <caption class="sr-only">Cookies in the selected scope. Select a row for details.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Cookie</th>
+            <th scope="col">Value</th>
+            <th scope="col">Flags</th>
+            <th scope="col">Expires</th>
+          </tr>
+        </thead>
+        <tbody id="cookieTableBody"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="emptyState" hidden></p>
+  </section>
+
+  <section class="panel" id="previewPanel" hidden>
+    <div class="preview-head">
+      <h2 class="panel-title">Output preview</h2>
+      <div class="preview-actions">
+        <button type="button" id="copyPreviewBtn" class="btn btn-tiny">Copy again</button>
+        <button type="button" id="closePreviewBtn" class="btn btn-tiny btn-ghost">Hide</button>
+      </div>
+    </div>
+    <p class="muted" id="previewMeta"></p>
+    <pre id="previewText"></pre>
+  </section>
+
+  <section class="panel" id="helpPanel" hidden>
+    <h2 class="panel-title">Privacy &amp; responsible use</h2>
+    <ul class="help-list">
+      <li><strong>Local only.</strong> Cookie Vault has no server, no analytics and makes no network requests. Data leaves the browser only when <em>you</em> save or copy it.</li>
+      <li><strong>Read-only.</strong> This extension never creates, edits or deletes cookies, and never replays them for you.</li>
+      <li><strong>Treat exports like passwords.</strong> A cookies file can impersonate a logged-in session. Store it securely and delete it when you are finished. "Hide cookie values" produces a shareable, value-free audit.</li>
+      <li><strong>Authorised use only.</strong> Inspect cookies for accounts and systems you own or have explicit written permission to test. Unauthorised access may violate laws such as the CFAA.</li>
+      <li><strong>Permissions.</strong> <code>cookies</code> to read them, <code>tabs</code> to know the current page, <code>downloads</code> to save your file, <code>storage</code> to remember your options, <code>clipboardWrite</code> for the Copy button.</li>
+    </ul>
+  </section>
+
+  <footer class="footer">
+    <button type="button" id="helpBtn" class="btn btn-link">Privacy &amp; responsible use</button>
+  </footer>
+
+  <div class="toast" id="statusRegion" role="status" aria-live="polite"></div>
+
+  <script src="popup.js"></script>
 </body>
 </html>

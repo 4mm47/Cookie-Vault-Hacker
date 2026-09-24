@@ -1,11 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "🍪 Cookie Vault Hacker 🍪",
-  "version": "1.7",
-  "description": "🕵️ Steals all active site cookies and packages them for download. 📥",
+  "name": "Cookie Vault - Session Inspector & Exporter",
+  "short_name": "Cookie Vault",
+  "version": "2.0.0",
+  "description": "Read-only cookie inspector. Review, filter and export the cookies of the current site or your whole profile as Netscape, JSON, CSV, header or JS. Nothing is ever uploaded.",
+  "minimum_chrome_version": "105",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
+    "default_title": "Cookie Vault - inspect & export cookies",
     "default_popup": "popup.html",
-    "default_icon": "🍪"
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
@@ -13,10 +27,13 @@
   "permissions": [
     "cookies",
     "tabs",
-    "downloads"
+    "downloads",
+    "storage",
+    "clipboardWrite"
   ],
   "host_permissions": [
-    "*://*/*"  // Relying ONLY on the powerful wildcard permission
+    "http://*/*",
+    "https://*/*"
   ]
-  // NO content_scripts array present
 }
+
